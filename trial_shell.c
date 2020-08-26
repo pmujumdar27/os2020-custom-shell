@@ -8,10 +8,12 @@
 
 #define MAX_COMM_SIZE 2000
 #define ARGSIZE 100
+#define CUSTOM_COUNT 2
 
 char CWD[256];
 
-char *shell_commands[3] = {"cd", "help", "exit"};
+char *SHELL_COMMANDS[3] = {"cd", "help", "exit"};
+char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls"};
 
 int EXIT_SHELL = 0;
 
@@ -26,6 +28,9 @@ struct parsed_cmd *create_cmd(int argc, char **argv){
     pc->argv = argv;
     return pc;
 }
+
+void custom_pwd();
+void custom_ls(struct parsed_cmd *pc);
 
 char *get_input(){
     int cmd_size = MAX_COMM_SIZE;
@@ -96,7 +101,7 @@ struct parsed_cmd* parse_args(char *command){
     return pc;
 }
 
-void execute_command(struct parsed_cmd* pc, int builtin_flag){
+int execute_command(struct parsed_cmd* pc, int builtin_flag){
     char **args = pc->argv;
     if(builtin_flag<0){
         int rc = fork();
@@ -108,21 +113,47 @@ void execute_command(struct parsed_cmd* pc, int builtin_flag){
         else if(rc==0){
             // child process
             // printf("number of arguments you entered is: %d\n", pc->argc);
-            if(execvp(args[0], args)==-1){
-                // Error in executing command
-                fprintf(stderr, "Error executing this command\n");
-                exit(EXIT_FAILURE);
+
+            // flag to tell if it's a custom command
+            int custom_comm = -1;
+
+            for(int i=0; i<CUSTOM_COUNT; i++){
+                if(strcmp(args[0], custom_comms[i])==0){
+                    custom_comm = i;
+                    break;
+                }
+            }
+
+            if(custom_comm>=0){
+                if(custom_comm==0){
+                    custom_pwd();
+                }
+                else if(custom_comm==1){
+                    custom_ls(pc);
+                }
             }
             else{
-                printf("\n");
-                wait(NULL);
-                // printf("\n");
-                return;
+                // Use inbuilt binary from the OS to execute the command
+                printf("This is from binary\n"); //Comment this later
+                if(execvp(args[0], args)==-1){
+                    // Error in executing command
+                    fprintf(stderr, "Error executing this command\n");
+                    exit(EXIT_FAILURE);
+                }
+                else{
+                    printf("\n");
+                    wait(NULL);
+                    // exit(EXIT_SUCCESS);
+                    return 0;
+                }
             }
         }
     }
     else if(builtin_flag==0){
-        chdir(args[1]);
+        int cdr_success = chdir(args[1]);
+        if(cdr_success==-1){
+            fprintf(stderr, "cd: Enter a valid directory\n");
+        }
     }
     else if(builtin_flag==1){
         printf("This custom shell is made by Pushkar The Great\nThis is the help for this shell\n");
@@ -130,7 +161,9 @@ void execute_command(struct parsed_cmd* pc, int builtin_flag){
     else if(builtin_flag==2){
         printf("Exiting ...\n");
         EXIT_SHELL = 1;
+        return 1;
     }
+    return 0;
 }
 
 void shell_loop(){
@@ -148,20 +181,53 @@ void shell_loop(){
         pc = parse_args(command);
 
         for(int i=0; i<3; i++){
-            if(strcmp(pc->argv[0], shell_commands[i])==0){
+            if(strcmp(pc->argv[0], SHELL_COMMANDS[i])==0){
                 builtin_flag = i;
             }
         }
 
         // executing the entered command
-        execute_command(pc, builtin_flag);
+        int EXIT_NOW = execute_command(pc, builtin_flag);
         wait(NULL);
         free(command);
         free(pc);
+        if(EXIT_NOW==1){
+            return;
+        }
     }
 }
 
 int main(int argc, char *argv[]){
     shell_loop();
     return EXIT_SUCCESS;
+}
+
+void custom_pwd(){
+    char cwd[256];
+    // char *cwd = (char*)malloc(256*sizeof(char));
+    if(cwd==NULL){
+        fprintf(stderr, "pwd: Error in finding pwd");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", getcwd(cwd, sizeof(cwd)));
+    // free(cwd);
+    exit(EXIT_SUCCESS);
+}
+
+void custom_ls(struct parsed_cmd *pc){
+    char *path = ".";
+    if(pc->argc > 1){
+        path = pc->argv[1];
+    }
+    DIR *dp;
+    if((dp=opendir(path))==NULL){
+        fprintf(stderr, "custom_ls: cannot open directory %s\n", path);
+        exit(EXIT_FAILURE);
+    }
+    struct dirent *d;
+    while((d=readdir(dp))!=NULL){
+        printf("%s\t", d->d_name);
+    }
+    printf("\n");
+    exit(EXIT_SUCCESS);
 }
