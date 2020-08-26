@@ -15,6 +15,18 @@ char *shell_commands[3] = {"cd", "help", "exit"};
 
 int EXIT_SHELL = 0;
 
+struct parsed_cmd{
+    int argc;
+    char **argv;
+};
+
+struct parsed_cmd *create_cmd(int argc, char **argv){
+    struct parsed_cmd *pc = (struct parsed_cmd*)malloc(sizeof(struct parsed_cmd));
+    pc->argc = argc;
+    pc->argv = argv;
+    return pc;
+}
+
 char *get_input(){
     int cmd_size = MAX_COMM_SIZE;
     char *cmd = (char*)malloc(cmd_size*sizeof(char));
@@ -47,7 +59,7 @@ char *get_input(){
     }
 }
 
-char **parse_args(char *command){
+struct parsed_cmd* parse_args(char *command){
     int argsize = ARGSIZE;
     char ** args = malloc(argsize*sizeof(char*));
     char *arg;
@@ -80,10 +92,12 @@ char **parse_args(char *command){
     }
     args[ptr] = NULL;
     printf("\n");
-    return args;
+    struct parsed_cmd *pc = create_cmd(ptr, args);
+    return pc;
 }
 
-void execute_command(char **args, int builtin_flag){
+void execute_command(struct parsed_cmd* pc, int builtin_flag){
+    char **args = pc->argv;
     if(builtin_flag<0){
         int rc = fork();
         if(rc<0){
@@ -93,6 +107,7 @@ void execute_command(char **args, int builtin_flag){
         }
         else if(rc==0){
             // child process
+            // printf("number of arguments you entered is: %d\n", pc->argc);
             if(execvp(args[0], args)==-1){
                 // Error in executing command
                 fprintf(stderr, "Error executing this command\n");
@@ -120,7 +135,7 @@ void execute_command(char **args, int builtin_flag){
 
 void shell_loop(){
     char *command;
-    char **args;
+    struct parsed_cmd* pc;
     char *username = getenv("USER");
     while(EXIT_SHELL==0){
         printf("\n%s@ %s\n> $ ", username, getcwd(CWD, sizeof(CWD)));
@@ -130,17 +145,19 @@ void shell_loop(){
         int builtin_flag = -1;
 
         // parsing input
-        args = parse_args(command);
+        pc = parse_args(command);
 
         for(int i=0; i<3; i++){
-            if(strcmp(args[0], shell_commands[i])==0){
+            if(strcmp(pc->argv[0], shell_commands[i])==0){
                 builtin_flag = i;
             }
         }
 
         // executing the entered command
-        execute_command(args, builtin_flag);
+        execute_command(pc, builtin_flag);
         wait(NULL);
+        free(command);
+        free(pc);
     }
 }
 
