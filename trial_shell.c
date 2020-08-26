@@ -1,19 +1,20 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<sys/types.h>
-#include<unistd.h>
 #include<sys/wait.h>
+#include<sys/stat.h>
+#include<unistd.h>
 #include<string.h>
 #include<dirent.h>
 
 #define MAX_COMM_SIZE 2000
 #define ARGSIZE 100
-#define CUSTOM_COUNT 2
+#define CUSTOM_COUNT 4
 
 char CWD[256];
 
 char *SHELL_COMMANDS[3] = {"cd", "help", "exit"};
-char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls"};
+char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls", "mkdir", "cat"};
 
 int EXIT_SHELL = 0;
 
@@ -31,6 +32,8 @@ struct parsed_cmd *create_cmd(int argc, char **argv){
 
 void custom_pwd();
 void custom_ls(struct parsed_cmd *pc);
+void custom_mkdir(struct parsed_cmd *pc);
+void custom_cat(struct parsed_cmd *pc);
 
 char *get_input(){
     int cmd_size = MAX_COMM_SIZE;
@@ -112,8 +115,6 @@ int execute_command(struct parsed_cmd* pc, int builtin_flag){
         }
         else if(rc==0){
             // child process
-            // printf("number of arguments you entered is: %d\n", pc->argc);
-
             // flag to tell if it's a custom command
             int custom_comm = -1;
 
@@ -130,6 +131,12 @@ int execute_command(struct parsed_cmd* pc, int builtin_flag){
                 }
                 else if(custom_comm==1){
                     custom_ls(pc);
+                }
+                else if(custom_comm==2){
+                    custom_mkdir(pc);
+                }
+                else if(custom_comm==3){
+                    custom_cat(pc);
                 }
             }
             else{
@@ -214,20 +221,62 @@ void custom_pwd(){
     exit(EXIT_SUCCESS);
 }
 
-void custom_ls(struct parsed_cmd *pc){
-    char *path = ".";
-    if(pc->argc > 1){
-        path = pc->argv[1];
-    }
+void ls_helper(char *path){
     DIR *dp;
     if((dp=opendir(path))==NULL){
         fprintf(stderr, "custom_ls: cannot open directory %s\n", path);
         exit(EXIT_FAILURE);
     }
+    printf("%s:\n", path);
     struct dirent *d;
     while((d=readdir(dp))!=NULL){
         printf("%s\t", d->d_name);
     }
     printf("\n");
+}
+
+void custom_ls(struct parsed_cmd *pc){
+    char *path = ".";
+    if(pc->argc > 1){
+        for(int i=1; i<pc->argc; i++){
+            path = pc->argv[i];
+            if(i>1){
+                printf("\n");
+            }
+            ls_helper(path);
+        }
+    }
+    else{
+        ls_helper(path);
+    }
+    exit(EXIT_SUCCESS);
+}
+
+void custom_mkdir(struct parsed_cmd *pc){
+    if(pc->argc < 2){
+        fprintf(stderr, "mkdir: Please specify the path of the directory you want to create\n");
+        exit(EXIT_FAILURE);
+    }
+    if(mkdir(pc->argv[1], 0777)==-1){
+        fprintf(stderr, "mkdir: Couldn't create directory\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Directory created\n");
+    exit(EXIT_SUCCESS);
+}
+
+void custom_cat(struct parsed_cmd *pc){
+    FILE *fptr;
+    fptr = fopen(pc->argv[1], "r");
+    if(fptr==NULL){
+        fprintf(stderr, "cat: Error in opening the file/couldn't locate the file\n");
+        exit(EXIT_FAILURE);
+    }
+    char c = fgetc(fptr);
+    while(c!=EOF){
+        printf("%c", c);
+        c = fgetc(fptr);
+    }
+    fclose(fptr);
     exit(EXIT_SUCCESS);
 }
