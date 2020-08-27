@@ -6,15 +6,16 @@
 #include<unistd.h>
 #include<string.h>
 #include<dirent.h>
+#include<regex.h> //for grep
 
 #define MAX_COMM_SIZE 2000
 #define ARGSIZE 100
-#define CUSTOM_COUNT 4
+#define CUSTOM_COUNT 5
 
 char CWD[256];
 
 char *SHELL_COMMANDS[3] = {"cd", "help", "exit"};
-char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls", "mkdir", "cat"};
+char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls", "mkdir", "cat", "grep"};
 
 int EXIT_SHELL = 0;
 
@@ -34,6 +35,7 @@ void custom_pwd();
 void custom_ls(struct parsed_cmd *pc);
 void custom_mkdir(struct parsed_cmd *pc);
 void custom_cat(struct parsed_cmd *pc);
+void custom_grep(struct parsed_cmd *pc);
 
 char *get_input(){
     int cmd_size = MAX_COMM_SIZE;
@@ -137,6 +139,9 @@ int execute_command(struct parsed_cmd* pc, int builtin_flag){
                 }
                 else if(custom_comm==3){
                     custom_cat(pc);
+                }
+                else if(custom_comm==4){
+                    custom_grep(pc);
                 }
             }
             else{
@@ -279,4 +284,48 @@ void custom_cat(struct parsed_cmd *pc){
     }
     fclose(fptr);
     exit(EXIT_SUCCESS);
+}
+
+void custom_grep(struct parsed_cmd *pc){
+    FILE *fp;
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t lsz;
+
+    if(pc->argc==1){
+        fprintf(stderr, "grep: <searchterm> <filename>\n");
+        exit(EXIT_FAILURE);
+    }
+    // else if(pc->argc==2){
+    //     // Take input from stdin
+    // }
+    else if(pc->argc>=2){
+        regex_t regex;
+        int rv;
+        if(pc->argc==3){
+            fp = fopen(pc->argv[2], "r");
+            if(fp==NULL){
+                fprintf(stderr, "grep: cannot open file\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        if(pc->argc==2){
+            fp = stdin;
+        }
+        while((lsz=getline(&line, &len, fp))!=-1){
+            rv = regcomp(&regex, pc->argv[1], 0);
+            rv = regexec(&regex, line, 0, NULL, 0);
+            if(rv==0){
+                printf("%s", line);
+            }
+            else if(rv==REG_NOMATCH){
+                ;
+            }
+            else{
+                fprintf(stderr, "Error in matching regex\n");
+            }
+        }
+        if(pc->argc==3) fclose(fp);
+        exit(EXIT_SUCCESS);
+    }
 }
