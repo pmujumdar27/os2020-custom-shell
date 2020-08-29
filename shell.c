@@ -1,12 +1,8 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include<sys/types.h>
 #include<sys/wait.h>
-#include<sys/stat.h>
 #include<unistd.h>
 #include<string.h>
-#include<dirent.h>
-#include<regex.h> //for grep
 
 #include "globals.h"
 #include "pwd.h"
