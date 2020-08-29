@@ -1,0 +1,1 @@
+void custom_grep(struct parsed_cmd *pc);

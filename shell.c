@@ -8,6 +8,13 @@
 #include<dirent.h>
 #include<regex.h> //for grep
 
+#include "globals.h"
+#include "pwd.h"
+#include "ls.h"
+#include "mkdir.h"
+#include "cat.h"
+#include "grep.h"
+
 #define MAX_COMM_SIZE 2000
 #define ARGSIZE 100
 #define CUSTOM_COUNT 5
@@ -18,24 +25,6 @@ char *SHELL_COMMANDS[3] = {"cd", "help", "exit"};
 char *custom_comms[CUSTOM_COUNT] = {"pwd", "ls", "mkdir", "cat", "grep"};
 
 int EXIT_SHELL = 0;
-
-struct parsed_cmd{
-    int argc;
-    char **argv;
-};
-
-struct parsed_cmd *create_cmd(int argc, char **argv){
-    struct parsed_cmd *pc = (struct parsed_cmd*)malloc(sizeof(struct parsed_cmd));
-    pc->argc = argc;
-    pc->argv = argv;
-    return pc;
-}
-
-void custom_pwd();
-void custom_ls(struct parsed_cmd *pc);
-void custom_mkdir(struct parsed_cmd *pc);
-void custom_cat(struct parsed_cmd *pc);
-void custom_grep(struct parsed_cmd *pc);
 
 char *get_input(){
     int cmd_size = MAX_COMM_SIZE;
@@ -212,120 +201,4 @@ void shell_loop(){
 int main(int argc, char *argv[]){
     shell_loop();
     return EXIT_SUCCESS;
-}
-
-void custom_pwd(){
-    char cwd[256];
-    // char *cwd = (char*)malloc(256*sizeof(char));
-    if(cwd==NULL){
-        fprintf(stderr, "pwd: Error in finding pwd");
-        exit(EXIT_FAILURE);
-    }
-    printf("%s\n", getcwd(cwd, sizeof(cwd)));
-    // free(cwd);
-    exit(EXIT_SUCCESS);
-}
-
-void ls_helper(char *path){
-    DIR *dp;
-    if((dp=opendir(path))==NULL){
-        fprintf(stderr, "custom_ls: cannot open directory %s\n", path);
-        exit(EXIT_FAILURE);
-    }
-    printf("%s:\n", path);
-    struct dirent *d;
-    while((d=readdir(dp))!=NULL){
-        printf("%s\t", d->d_name);
-    }
-    printf("\n");
-}
-
-void custom_ls(struct parsed_cmd *pc){
-    char *path = ".";
-    if(pc->argc > 1){
-        for(int i=1; i<pc->argc; i++){
-            path = pc->argv[i];
-            if(i>1){
-                printf("\n");
-            }
-            ls_helper(path);
-        }
-    }
-    else{
-        ls_helper(path);
-    }
-    exit(EXIT_SUCCESS);
-}
-
-void custom_mkdir(struct parsed_cmd *pc){
-    if(pc->argc < 2){
-        fprintf(stderr, "mkdir: Please specify the path of the directory you want to create\n");
-        exit(EXIT_FAILURE);
-    }
-    if(mkdir(pc->argv[1], 0777)==-1){
-        fprintf(stderr, "mkdir: Couldn't create directory\n");
-        exit(EXIT_FAILURE);
-    }
-    printf("Directory created\n");
-    exit(EXIT_SUCCESS);
-}
-
-void custom_cat(struct parsed_cmd *pc){
-    FILE *fptr;
-    fptr = fopen(pc->argv[1], "r");
-    if(fptr==NULL){
-        fprintf(stderr, "cat: Error in opening the file/couldn't locate the file\n");
-        exit(EXIT_FAILURE);
-    }
-    char c = fgetc(fptr);
-    while(c!=EOF){
-        printf("%c", c);
-        c = fgetc(fptr);
-    }
-    fclose(fptr);
-    exit(EXIT_SUCCESS);
-}
-
-void custom_grep(struct parsed_cmd *pc){
-    FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t lsz;
-
-    if(pc->argc==1){
-        fprintf(stderr, "grep: <searchterm> <filename>\n");
-        exit(EXIT_FAILURE);
-    }
-    // else if(pc->argc==2){
-    //     // Take input from stdin
-    // }
-    else if(pc->argc>=2){
-        regex_t regex;
-        int rv;
-        if(pc->argc==3){
-            fp = fopen(pc->argv[2], "r");
-            if(fp==NULL){
-                fprintf(stderr, "grep: cannot open file\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        if(pc->argc==2){
-            fp = stdin;
-        }
-        while((lsz=getline(&line, &len, fp))!=-1){
-            rv = regcomp(&regex, pc->argv[1], 0);
-            rv = regexec(&regex, line, 0, NULL, 0);
-            if(rv==0){
-                printf("%s", line);
-            }
-            else if(rv==REG_NOMATCH){
-                ;
-            }
-            else{
-                fprintf(stderr, "Error in matching regex\n");
-            }
-        }
-        if(pc->argc==3) fclose(fp);
-        exit(EXIT_SUCCESS);
-    }
 }
