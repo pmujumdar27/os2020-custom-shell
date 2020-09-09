@@ -1,0 +1,1 @@
+void custom_rm(struct parsed_cmd *pc);

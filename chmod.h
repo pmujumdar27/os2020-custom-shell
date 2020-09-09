@@ -1,0 +1,1 @@
+void custom_chmod(struct parsed_cmd *pc);
